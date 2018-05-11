@@ -96,6 +96,14 @@ resources:
                       - "lambda:InvokeFunction"
                     # TODO: use variables? seems to be a Serverless issue
                     Resource: "arn:aws:lambda:us-east-1:677695147188:function:mp-watch-dev-process_tweets"
+                  - Effect: 'Allow'
+                    Action:
+                      - "comprehend:DetectEntities"
+                    Resource: "*"
+                  - Effect: 'Allow'
+                    Action:
+                      - "dynamodb:PutItem"
+                    Resource: "arn:aws:dynamodb:eu-west-1:*:*"
 
 
 plugins:
