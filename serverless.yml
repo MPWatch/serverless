@@ -77,8 +77,14 @@ provider:
 #    - exclude-me-dir/**
 
 functions:
+  # get_mp launches the process.
+  # It runs through all MPs and posts their twitter_handle to the SNS topic.
   get_mp:
     handler: get_mp.main
+    events:
+      # Runs every Friday at 11am.
+      - schedule: cron(0 11 ? * FRI *)
+  # Crawler uses the Twitter API and AWS Comprehend to classify tweets.
   process_tweets:
     handler: process_tweets.main
     events:

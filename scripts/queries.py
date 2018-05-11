@@ -26,13 +26,27 @@ class Query():
 
             try:
                 # Tweets contains a list of all Tweets, by topic and date
-                db.cur.execute("CREATE TABLE tweets(tweet_id varchar(255) NOT NULL, added DATE NOT NULL, entity varchar(255) NOT NULL, twitter_handle varchar(255) NOT NULL, content varchar(600) NOT NULL, url varchar(255), followers_count INT, retweet_count INT, profile_pic_link varchar(255), profile_url varchar(255), created varchar(255) NOT NULL, PRIMARY KEY (tweet_id, entity), FOREIGN KEY (twitter_handle) REFERENCES mps(twitter_handle))")
+                db.cur.execute("CREATE TABLE tweets(tweet_id varchar(255) NOT NULL, added DATE NOT NULL, twitter_handle varchar(255) NOT NULL, content varchar(600) NOT NULL, url varchar(255), followers_count INT, retweet_count INT, profile_pic_link varchar(255), profile_url varchar(255), created varchar(255) NOT NULL, PRIMARY KEY (tweet_id), FOREIGN KEY (twitter_handle) REFERENCES mps(twitter_handle))")
                 db.conn.commit()
             except Error as e:
                 # handles 'Table already exists' error
                 print(str(e))
                 if not e.errno == 1050:
                     raise e
+
+            try:
+                # Topics contains of all tweets with their associated topic(s)
+                table = "CREATE TABLE topics"
+                fields = "tweet_id varchar(255) NOT NULL, entity varchar(255) NOT NULL, original_topic varchar(255) NOT NULL, twitter_handle varchar(255) NOT NULL, added DATE NOT NULL"
+                constraints = "PRIMARY KEY (tweet_id, entity), FOREIGN KEY (twitter_handle) REFERENCES mps(twitter_handle), FOREIGN KEY (tweet_id) REFERENCES tweets(tweet_id)"
+                db.cur.execute(table + "(" + fields + ", " + constraints + ")")
+                db.conn.commit()
+            except Error as e:
+                # handles 'Table already exists' error
+                print(str(e))
+                if not e.errno == 1050:
+                    raise e
+
 
     def insert_tweets_for_entity(self, serialized_tweets):
         with self.db as db:
