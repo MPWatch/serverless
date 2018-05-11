@@ -24,3 +24,7 @@ var/
 
 # Dependency directories
 node_modules/
+
+*.sh
+
+__pycache__

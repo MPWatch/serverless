@@ -1,31 +1,25 @@
-# Welcome to Serverless!
-#
-# This file is the main config file for your service.
-# It's very minimal at this point and uses default values.
-# You can always add more config options for more control.
-# We've included some commented out config examples here.
-# Just uncomment any of them to get that config option.
-#
-# For full config options, check the docs:
-#    docs.serverless.com
-#
-# Happy Coding!
-
-service: mp-watch # NOTE: update this with your service name
-
-# You can pin your service to only deploy with a specific Serverless version
-# Check out our docs for more details
-# frameworkVersion: "=X.X.X"
+service: mp-watch
 
 provider:
   name: aws
   runtime: python3.6
+  region: us-east-1
+  stage: dev
 
 # IAM profile
   profile: serverless
 
+# IAM roles
+  role: lambdaPermission
+
 # Environment variables
   environment:
+    # Personal AWS account
+    AWS_ACCOUNT: ${file(./aws.env.yml):creds.AWS_ACCOUNT}
+    # Function ARNs
+    GET_MP_ARN: "arn:aws:lambda:${self:provider.region}:${file(./aws.env.yml):creds.AWS_ACCOUNT}:function:${self:service}-${self:provider.stage}-get_mp"
+    PROCESS_TWEETS_ARN: "arn:aws:lambda:${self:provider.region}:${file(./aws.env.yml):creds.AWS_ACCOUNT}:function:${self:service}-${self:provider.stage}-process_tweets"
+    # SECRETS
     TWITTER_CONSUMER_KEY: ${file(./twitter.env.yml):twitter.TWITTER_CONSUMER_KEY}
     TWITTER_CONSUMER_SECRET: ${file(./twitter.env.yml):twitter.TWITTER_CONSUMER_SECRET}
     TWITTER_ACCESS_TOKEN_KEY: ${file(./twitter.env.yml):twitter.TWITTER_ACCESS_TOKEN_KEY}
@@ -35,9 +29,6 @@ provider:
     AWS_DB_PASSWORD: ${file(./aws.env.yml):rds.AWS_DB_PASSWORD}
     AWS_DB_HOST: ${file(./aws.env.yml):rds.AWS_DB_HOST}
 
-# you can overwrite defaults here
-#  stage: dev
-#  region: us-east-1
 
 # you can add statements to the Lambda function's IAM Role here
 #  iamRoleStatements:
@@ -55,10 +46,6 @@ provider:
 #            - "Ref" : "ServerlessDeploymentBucket"
 #            - "/*"
 
-# you can define service wide environment variables here
-#  environment:
-#    variable1: value1
-
 # you can add packaging information here
 #package:
 #  include:
@@ -69,55 +56,47 @@ provider:
 #    - exclude-me-dir/**
 
 functions:
-  hello:
-    handler: handler.fetch_tweets
-  fetch_tweets:
-    handler: fetch_tweets.main
+  get_mp:
+    handler: get_mp.main
+  process_tweets:
+    handler: process_tweets.main
+    # events:
+    #   - http:
+    #       path: /
+    #       method: post
+    #       request:
+    #         parameters:
+    #           headers:
+    #             twitter_handle: true
 
-#    The following are a few example events you can configure
-#    NOTE: Please make sure to change your handler code to work with those events
-#    Check the event documentation for details
-#    events:
-#      - http:
-#          path: users/create
-#          method: get
-#      - s3: ${env:BUCKET}
-#      - schedule: rate(10 minutes)
-#      - sns: greeter-topic
-#      - stream: arn:aws:dynamodb:region:XXXXXX:table/foo/stream/1970-01-01T00:00:00.000
-#      - alexaSkill: amzn1.ask.skill.xx-xx-xx-xx
-#      - alexaSmartHome: amzn1.ask.skill.xx-xx-xx-xx
-#      - iot:
-#          sql: "SELECT * FROM 'some_topic'"
-#      - cloudwatchEvent:
-#          event:
-#            source:
-#              - "aws.ec2"
-#            detail-type:
-#              - "EC2 Instance State-change Notification"
-#            detail:
-#              state:
-#                - pending
-#      - cloudwatchLog: '/aws/lambda/hello'
-#      - cognitoUserPool:
-#          pool: MyUserPool
-#          trigger: PreSignUp
+# CloudFormation Resource Templates
+resources:
+  Resources:
+    lambdaPermission:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: lambdaPermission
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - lambda.amazonaws.com
+              Action: sts:AssumeRole
+        ManagedPolicyArns:
+            - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+        Policies:
+            - PolicyName: LambdaFunctionInvocation
+              PolicyDocument:
+                Version: '2012-10-17'
+                Statement:
+                  - Effect: 'Allow'
+                    Action:
+                      - "lambda:InvokeFunction"
+                    # TODO: use variables? seems to be a Serverless issue
+                    Resource: "arn:aws:lambda:us-east-1:677695147188:function:mp-watch-dev-process_tweets"
 
-#    Define function environment variables here
-#    environment:
-#      variable2: value2
-
-# you can add CloudFormation resource templates here
-#resources:
-#  Resources:
-#    NewResource:
-#      Type: AWS::S3::Bucket
-#      Properties:
-#        BucketName: my-new-bucket
-#  Outputs:
-#     NewOutput:
-#       Description: "Description for the output"
-#       Value: "Some output value"
 
 plugins:
   - serverless-python-requirements
