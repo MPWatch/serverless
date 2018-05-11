@@ -1,5 +1,14 @@
 service: mp-watch
 
+custom:
+  # SNS topic
+  DISPATCH_MP_SNS: "dispatchMp"
+
+  # Plugin Customizations
+  # skip replacing hardcoded regions. Data saved
+  pseudoParameters:
+        skipRegionReplace: true
+
 provider:
   name: aws
   runtime: python3.6
@@ -19,6 +28,18 @@ provider:
     # Function ARNs
     GET_MP_ARN: "arn:aws:lambda:${self:provider.region}:${file(./aws.env.yml):creds.AWS_ACCOUNT}:function:${self:service}-${self:provider.stage}-get_mp"
     PROCESS_TWEETS_ARN: "arn:aws:lambda:${self:provider.region}:${file(./aws.env.yml):creds.AWS_ACCOUNT}:function:${self:service}-${self:provider.stage}-process_tweets"
+    # SNS ARNs
+    DISPATCH_MP_SNS_ARN:
+      Fn::Join:
+        - ''
+        - - 'arn:aws:sns:'
+          - Ref: AWS::Region
+          - ":"
+          - Ref: AWS::AccountId
+          - ":"
+          - Fn::GetAtt:
+              - crawlMPTopic
+              - TopicName
     # SECRETS
     TWITTER_CONSUMER_KEY: ${file(./twitter.env.yml):twitter.TWITTER_CONSUMER_KEY}
     TWITTER_CONSUMER_SECRET: ${file(./twitter.env.yml):twitter.TWITTER_CONSUMER_SECRET}
@@ -60,18 +81,20 @@ functions:
     handler: get_mp.main
   process_tweets:
     handler: process_tweets.main
-    # events:
-    #   - http:
-    #       path: /
-    #       method: post
-    #       request:
-    #         parameters:
-    #           headers:
-    #             twitter_handle: true
+    events:
+      - sns: arn:aws:sns:${self:provider.region}:#{AWS::AccountId}:${self:custom.DISPATCH_MP_SNS}
 
 # CloudFormation Resource Templates
 resources:
   Resources:
+    # Implements queue with SNS topics
+    crawlMPTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        DisplayName: "The message contains an MP's twitter handle."
+        TopicName: ${self:custom.DISPATCH_MP_SNS}
+
+    # IAM profile shared by all functions in this service
     lambdaPermission:
       Type: AWS::IAM::Role
       Properties:
@@ -91,20 +114,29 @@ resources:
               PolicyDocument:
                 Version: '2012-10-17'
                 Statement:
+                  # Invoke functions in other functions
                   - Effect: 'Allow'
                     Action:
                       - "lambda:InvokeFunction"
                     # TODO: use variables? seems to be a Serverless issue
                     Resource: "arn:aws:lambda:us-east-1:677695147188:function:mp-watch-dev-process_tweets"
+                  # Use AWS Comprehend
                   - Effect: 'Allow'
                     Action:
                       - "comprehend:DetectEntities"
                     Resource: "*"
+                  # Write single item to DynamoDB
                   - Effect: 'Allow'
                     Action:
                       - "dynamodb:PutItem"
                     Resource: "arn:aws:dynamodb:eu-west-1:*:*"
+                  # Publish to SNS
+                  - Effect: 'Allow'
+                    Action:
+                      - "sns:Publish"
+                    Resource: ${self:provider.environment.DISPATCH_MP_SNS_ARN}
 
 
 plugins:
   - serverless-python-requirements
+  - serverless-pseudo-parameters

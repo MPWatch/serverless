@@ -51,7 +51,8 @@ def save_to_dynamodb(tweet, comprehend_response, classified_entities):
 
 def main(event, context):
     # event contains json with an MP's twitter handle
-    mp = event.get('mp', None)
+    sns_message = event['Records'][0]['Sns']
+    mp = sns_message.get('Message', None)
     # if the event is not provided, return error
     if not mp:
         return { "statusCode": 400, "body": json.dumps("Did not provide MP name.") }

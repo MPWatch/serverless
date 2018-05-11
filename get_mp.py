@@ -17,12 +17,14 @@ def main(event, context):
     db = DB(*db_creds)
     q = Query(db)
     mp_list = q.get_mps()
-    # lambda client
-    client = boto3.client('lambda')
-    for mp in mp_list:
-        client.invoke(
-            FunctionName=os.environ['PROCESS_TWEETS_ARN'],
-            Payload=json.dumps({'mp': mp.twitter_handle})
+    # sns client
+    client = boto3.client('sns')
+    # TODO: fix list end in prod
+    for mp in mp_list[:3]:
+        # Publish as messages to SNS queue.
+        client.publish(
+            TopicArn=os.environ.get('DISPATCH_MP_SNS_ARN', None),
+            Message=mp.twitter_handle
         )
     response = {
         "statusCode": 200,
