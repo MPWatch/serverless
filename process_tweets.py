@@ -9,6 +9,8 @@ import boto3
 from scripts.categorize import filter_entities, analyze_status, fetch_statuses, get_hashtags
 from scripts.dynamodb import save_to_dynamodb
 from scripts.tweet import Tweet, TweetEncoder
+from scripts.db import DB
+from scripts.queries import Query
 
 
 def main(event, context):
@@ -27,7 +29,8 @@ def main(event, context):
             # raw dump to DynamoDB. Saves all data as strings.
             save_to_dynamodb(status, comprehend_response, entities)
             # make Tweet object, save to MySQL
-            # TODO: save to MySQL db on RDS
+            # TODO: save tweet
+            # TODO: save topic
     except Exception as e:
         print(str(e))
     # response

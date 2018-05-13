@@ -12,6 +12,7 @@ class Query():
             raise AttributeError('db attribute must be a DB object. ' + str(type(db)) + ' given instead.')
         self.db = db
 
+    # TODO: replace with DB scripts
     def create_tables(self):
         with self.db as db:
             try:
@@ -38,7 +39,7 @@ class Query():
                 # Topics contains of all tweets with their associated topic(s)
                 table = "CREATE TABLE topics"
                 fields = "tweet_id varchar(255) NOT NULL, entity varchar(255) NOT NULL, original_topic varchar(255) NOT NULL, twitter_handle varchar(255) NOT NULL, added DATE NOT NULL"
-                constraints = "PRIMARY KEY (tweet_id, entity), FOREIGN KEY (twitter_handle) REFERENCES mps(twitter_handle), FOREIGN KEY (tweet_id) REFERENCES tweets(tweet_id)"
+                constraints = "PRIMARY KEY (tweet_id, original_topic), FOREIGN KEY (twitter_handle) REFERENCES mps(twitter_handle), FOREIGN KEY (tweet_id) REFERENCES tweets(tweet_id)"
                 db.cur.execute(table + "(" + fields + ", " + constraints + ")")
                 db.conn.commit()
             except Error as e:
@@ -47,12 +48,11 @@ class Query():
                 if not e.errno == 1050:
                     raise e
 
-
     def insert_tweets_for_entity(self, serialized_tweets):
         with self.db as db:
             for t in serialized_tweets:
                 try:
-                    db.cur.execute(("INSERT INTO tweets VALUES (\"{tweet_id}\", \"{date}\", \"{entity}\", \"{twitter_handle}\", \"{content}\", \"{url}\", \"{followers_count}\", \"{retweet_count}\", \"{profile_pic_link}\", \"{profile_url}\", \"{created}\")").format(**t))
+                    db.cur.execute(("INSERT INTO tweets VALUES (\"{tweet_id}\", \"{date}\", \"{twitter_handle}\", \"{content}\", \"{url}\", \"{followers_count}\", \"{retweet_count}\", \"{profile_pic_link}\", \"{profile_url}\", \"{created}\")").format(**t))
                 except Error as e:
                     # TODO: fix bugs
                     print(str(e))
@@ -63,24 +63,44 @@ class Query():
                         raise e
                 db.conn.commit()
 
+    def insert_tweet(self, tweet):
+        with self.db as db:
+            try:
+                db.cur.execute(("INSERT INTO tweets VALUES (\"{tweet_id}\", \"{date}\", \"{twitter_handle}\", \"{content}\", \"{url}\", \"{followers_count}\", \"{retweet_count}\", \"{profile_pic_link}\", \"{profile_url}\", \"{created}\")").format(**tweet))
+            except Error as e:
+                print(str(e))
+                pass
+                # TODO: fix. Ignores emojis, Unicode issues.
+            db.conn.commit()
+
+    def insert_topic(self, entity, original_topic, tweet):
+        with self.db as db:
+            try:
+                db.cur.execute(("INSERT INTO tweets VALUES (\"{t.tweet_id}\", \"{entity}\", \"{original_topic}\", \"{t.twitter_handle}\", \"{t.date}\")").format(t=tweet, entity=entity, original_topic=original_topic))
+            except Error as e:
+                print(str(e))
+                raise e
+            db.conn.commit()
+
     def get_recent_tweets_for_entity(self, entity):
         with self.db as db:
-            columns = "SELECT t.tweet_id, t.added, t.entity, t.content, t.url, t.followers_count, t.retweet_count, t.profile_pic_link, t.profile_url, t.created, m.name, m.twitter_handle"
-            tweet_table = ("(SELECT * FROM tweets WHERE entity=\"{0}\" AND added=(SELECT MAX(added) FROM tweets)) t").format(entity)
-            mp_table = "(SELECT name, twitter_handle from mps) m"
-            join_on = "t.twitter_handle = m.twitter_handle"
-            db.cur.execute(columns + " FROM " + tweet_table + " JOIN " + mp_table + " ON " + join_on)
+            first_join = "SELECT * FROM mps m JOIN"
+            _columns = "SELECT t.entity, t.original_topic, s.tweet_id, s.added, s.content, s.url, s.followers_count, s.retweet_count, s.profile_pic_link, s.profile_url, s.created, s.twitter_handle"
+            _topic_table = ("SELECT * FROM topics WHERE entity=\"{0}\" AND added=(SELECT MAX(added) FROM topics)").format(entity)
+            second_join = "(" + _columns + " FROM (" + _topic_table + ") t JOIN tweets s ON s.tweet_id = t.tweet_id) n"
+            join_on = " ON m.twitter_handle = n.twitter_handle"
+            db.cur.execute(first_join + second_join + join_on)
             cols = [c[0] for c in db.cur.description]
             return list(dict(zip(cols, t)) for t in db.cur.fetchall())
 
     def get_recent_entities(self):
         with self.db as db:
-            db.cur.execute("SELECT DISTINCT entity FROM tweets WHERE added=(SELECT MAX(added) FROM tweets)")
+            db.cur.execute("SELECT DISTINCT entity FROM topics WHERE added=(SELECT MAX(added) FROM topics)")
             return list(t[0] for t in db.cur.fetchall())
 
     def get_entity_size(self, entity):
         with self.db as db:
-            db.cur.execute(("SELECT COUNT(*) FROM tweets WHERE entity=\"{0}\" AND added=(SELECT MAX(added) FROM tweets)").format(entity))
+            db.cur.execute(("SELECT COUNT(*) FROM topics WHERE entity=\"{0}\" AND added=(SELECT MAX(added) FROM topics)").format(entity))
             return int(db.cur.fetchone()[0])
 
     def insert_mps(self, mps):
