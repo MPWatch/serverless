@@ -34,7 +34,3 @@ def analyze_status(status):
 
 def _filter_entities(entities):
     return [e['Text'] for e in entities if e['Score'] > 0.8 and '#' not in e['Text'] and 'http' not in e['Text'] and e['Type'] != 'DATE' and e['Type'] != 'QUANTITY']
-
-
-def get_hashtags(status):
-    return [h.text for h in status.hashtags if status.hashtags]

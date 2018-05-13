@@ -2,13 +2,27 @@ from json import dumps, JSONEncoder
 
 
 class Tweet:
-    def __init__(self, status, hashtags, entities):
-        self.status = status
-        self.hashtags = hashtags
+    """
+    Tweet is a mediating class between the database and scripts.
+    All attributes are primitives or collections of primitives.
+    """
+
+    def __init__(self, status, entities):
+        self.status_id = str(status.id)
+        self.handle = str(status.user.screen_name)
+        self.hashtags = [h.text for h in status.hashtags if status.hashtags]
+        self.text = str(status.text).replace('"', '')
+        self.url = str(status.urls[0].url) if len(status.urls) else None
+        self.followers_count = int(status.user.followers_count)
+        self.retweet_count = int(status.retweet_count) if status.retweet_count else 0
+        self.image_url = str(status.user.profile_image_url_https) if status.user.profile_image_url_https else None
+        self.profile_url = str(status.user.url) if status.user.url else None
+        # TODO: convert to date
+        self.created = str(status.created_at)
         self.entities = entities
 
     def __repr__(self):
-        return "Tweet(" + repr(self.status) + ", " + str(self.hashtags) + ", " + str(self.entities) + ")"
+        return "Tweet(" + repr(self.status_id) + ")"
 
     def normalize_hashtags(self):
         return [(w, _remove_special_chars(w)) for w in self.hashtags]
@@ -19,31 +33,25 @@ class Tweet:
     def serialize_json(self):
         return dumps(self, cls=TweetEncoder)
 
-    def serialize_mysql(self, entity, date):
-        status_id = str(self.status.id)
-        handle = str(self.status.user.screen_name)
-        text = str(self.status.text).replace('"', '')
-        url = str(self.status.urls[0].url) if len(self.status.urls) else None
-        followers_count = int(self.status.user.followers_count)
-        retweet_count = int(self.status.retweet_count) if self.status.retweet_count else 0
-        image_url = str(self.status.user.profile_image_url_https) if self.status.user.profile_image_url_https else None
-        profile_url = str(self.status.user.url) if self.status.user.url else None
-        created = str(self.status.created_at)
+    def serialize_mysql(self, date):
+        """
+        date: must be datetime object
+        """
         return {
-            'tweet_id': status_id,
+            'tweet_id': self.status_id,
             'date': date,
-            'entity': entity,
-            'twitter_handle': '@' + handle,
-            'content': text,
-            'url': url,
-            'followers_count': followers_count,
-            'retweet_count': retweet_count,
-            'profile_pic_link': image_url,
-            'profile_url': profile_url,
-            'created': created,
+            'twitter_handle': '@' + self.handle,
+            'content': self.text,
+            'url': self.url,
+            'followers_count': self.followers_count,
+            'retweet_count': self.retweet_count,
+            'profile_pic_link': self.image_url,
+            'profile_url': self.profile_url,
+            'created': self.created,
         }
 
     def serialize_dict(self):
+        # TODO: not in use. fix.
         """
         Serializes dictionary for AWS DynamoDB specs.
         Keys with empty values are not included in the serialization.
