@@ -3,7 +3,7 @@ certifi==2018.4.16
 chardet==3.0.4
 future==0.16.0
 idna==2.6
-mysql-connector-python==8.0.11
+mysql-connector-python==8.0.14
 oauthlib==2.0.7
 protobuf==3.5.2.post1
 python-twitter==3.4.1
